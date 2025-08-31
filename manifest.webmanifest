@@ -1,0 +1,16 @@
+{
+  "name": "百家樂勝率計算器",
+  "short_name": "Baccarat MC",
+  "start_url": "index_v42.html",
+  "display": "standalone",
+  "background_color": "#0f172a",
+  "theme_color": "#111827",
+  "description": "8 副牌、逐局扣牌、補三張牌規則、蒙地卡羅勝率試算（自動儲存 + 歷史趨勢 + 匯出CSV, v4.2）。",
+  "icons": [
+    {
+      "src": "data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 128 128'><rect width='128' height='128' fill='%23111827'/><text x='50%' y='54%' dominant-baseline='middle' text-anchor='middle' font-size='72' fill='%23e5e7eb'>B</text></svg>",
+      "sizes": "128x128",
+      "type": "image/svg+xml"
+    }
+  ]
+}
