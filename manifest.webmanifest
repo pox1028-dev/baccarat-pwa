@@ -5,7 +5,7 @@
   "display": "standalone",
   "background_color": "#0f172a",
   "theme_color": "#111827",
-  "description": "8 副牌、逐局扣牌、補三張牌規則、蒙地卡羅勝率試算。",
+  "description": "8 副牌、逐局扣牌、補三張牌規則、蒙地卡羅勝率試算（含自動儲存, v3）。",
   "icons": [
     {
       "src": "data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 128 128'><rect width='128' height='128' fill='%23111827'/><text x='50%' y='54%' dominant-baseline='middle' text-anchor='middle' font-size='72' fill='%23e5e7eb'>B</text></svg>",
