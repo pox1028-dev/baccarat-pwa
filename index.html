@@ -1,0 +1,185 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+  <meta name="theme-color" content="#111827"/>
+  <title>百家樂勝率計算器（PWA, Auto Save v4.1 Named）</title>
+  <link rel="manifest" href="manifest_v41.webmanifest">
+  <style>
+    :root { --bg:#0f172a; --card:#111827; --muted:#94a3b8; --accent:#22c55e; --text:#e5e7eb; --danger:#ef4444; }
+    *{ box-sizing:border-box; }
+    html,body{ margin:0; padding:0; background:var(--bg); color:var(--text); font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Noto Sans TC', 'PingFang TC', 'Hiragino Sans', 'Microsoft JhengHei', system-ui, sans-serif; }
+    header{ padding:16px 16px 8px; text-align:center; }
+    h1{ margin:0; font-size:20px; }
+    .wrap{ max-width:740px; margin:0 auto; padding:10px; }
+    .card{ background:var(--card); border:1px solid #1f2937; border-radius:12px; padding:14px; margin:10px; box-shadow: 0 6px 24px rgba(0,0,0,.25); }
+    label{ display:block; font-size:13px; color:var(--muted); margin-bottom:6px; }
+    input[type=text], input[type=number], select {
+      width:100%; padding:12px; border-radius:10px; border:1px solid #334155; background:#0b1220; color:var(--text);
+      outline:none;
+    }
+    .row{ display:flex; gap:10px; flex-wrap:wrap; }
+    .row > * { flex:1 1 180px; }
+    button{ background:#1f2937; color:var(--text); border:1px solid #374151; padding:10px 12px; border-radius:10px; }
+    button.primary{ background:var(--accent); border-color:#16a34a; color:#06220f; font-weight:600; }
+    button.danger{ background:#311316; border-color:#7f1d1d; color:#fecaca; }
+    small{ color:var(--muted); }
+    .stats{ display:flex; gap:10px; flex-wrap:wrap; }
+    .stat{ flex:1 1 140px; background:#0b1220; border:1px solid #334155; border-radius:12px; padding:12px; text-align:center; }
+    .stat h3{ margin:0; font-size:14px; color:var(--muted); }
+    .stat .v{ font-size:24px; font-weight:700; margin-top:6px; }
+    .footer{ text-align:center; color:var(--muted); padding:20px 10px 30px; font-size:12px; }
+    .chips{ margin-top:6px; }
+    .chip{ display:inline-flex; align-items:center; gap:6px; border:1px dashed #334155; border-radius:999px; padding:5px 8px; margin:4px 6px 0 0; }
+    .x{ cursor:pointer; color:#fca5a5; font-weight:700; }
+    .hint{ font-size:12px; color:var(--muted); margin-top:4px; }
+    .toggle { display:flex; align-items:center; gap:10px; }
+    .toggle input { transform: scale(1.1); }
+  </style>
+</head>
+<body>
+  <header><h1>百家樂勝率計算器（Auto Save v4.1 Named）</h1></header>
+  <div class="wrap">
+    <div class="card">
+      <div class="row">
+        <div>
+          <label>副數 (預設 8)</label>
+          <input id="decks" type="number" min="1" max="16" value="8">
+        </div>
+        <div>
+          <label>模擬局數 Trials（手機建議 20000~60000）</label>
+          <input id="trials" type="number" min="1000" step="1000" value="30000">
+        </div>
+        <div>
+          <label>固定亂數種子（可空白）</label>
+          <input id="seed" type="number" placeholder="如 20250831">
+        </div>
+      </div>
+      <div style="margin-top:10px;">
+        <label>輸入已開牌（**直接連續輸入即可**，例如 <b>AK103QQ7</b>；T 或 10 都代表 10）</label>
+        <input id="cards" type="text" placeholder="AK103QQ7 → 會解析成 A K 10 3 Q Q 7（空白/逗號會自動忽略）">
+        <div class="row" style="margin-top:10px;">
+          <button id="btnAdd">加入已開牌</button>
+          <button id="btnCompute" class="primary">計算下局勝率</button>
+          <button id="btnReset" class="danger">重設新牌靴</button>
+        </div>
+        <div class="row" style="margin-top:10px; align-items:center;">
+          <div class="toggle">
+            <input id="autoSave" type="checkbox" checked>
+            <label for="autoSave">自動儲存（localStorage）</label>
+          </div>
+          <button id="btnClearStore">清除儲存</button>
+        </div>
+        <div class="hint">Tips：每局把新開出的牌補進來再按「計算」。啟用自動儲存後，關閉頁面再回來仍會保留。</div>
+      </div>
+    </div>
+
+    <div class="card">
+      <label>目前已扣除的牌</label>
+      <div id="removed" class="chips"></div>
+      <div class="row" style="margin-top:6px;">
+        <small>總計已扣：<span id="removedCount">0</span> 張；剩餘：<span id="remainCount">0</span> 張</small>
+      </div>
+    </div>
+
+    <div class="card">
+      <label>結果</label>
+      <div class="stats">
+        <div class="stat"><h3>莊 (Banker)</h3><div id="bank" class="v">-</div></div>
+        <div class="stat"><h3>閒 (Player)</h3><div id="play" class="v">-</div></div>
+        <div class="stat"><h3>和 (Tie)</h3><div id="tie" class="v">-</div></div>
+        <div class="stat"><h3>模擬局數</h3><div id="n" class="v">-</div></div>
+      </div>
+      <div class="hint">規則：自然 8/9 停牌；閒 ≤5 補，莊依補三張牌規則判定。</div>
+    </div>
+
+    <div class="footer">可安裝為 App（PWA）。本工具僅供試算參考，賭博有風險，請量力而為。</div>
+  </div>
+
+  <script>
+  // ===== Monte Carlo core (JS) =====
+  const RANKS = ['A','2','3','4','5','6','7','8','9','10','J','Q','K'];
+  const VAL   = {'A':1,'2':2,'3':3,'4':4,'5':5,'6':6,'7':7,'8':8,'9':9,'10':0,'J':0,'Q':0,'K':0};
+  const VALUES_LIST = RANKS.map(r=>VAL[r]);
+
+  function newShoe(numDecks=8){ const shoe={}; for(const r of RANKS) shoe[r]=4*numDecks; return shoe; }
+  function shoeCounts(shoe){ return RANKS.map(r=>shoe[r]); }
+
+  // 連續輸入解析（AK103QQ7），空白/逗號忽略
+  function parseCards(s){
+    s=(s||'').toUpperCase().replace(/,/g,'').replace(/\s+/g,'');
+    const out=[];
+    for(let i=0;i<s.length;i++){
+      const ch=s[i];
+      if(ch==='1' && s[i+1]==='0'){ out.push('10'); i++; }
+      else if(ch==='T'){ out.push('10'); }
+      else if('A23456789JQK'.includes(ch)){ out.push(ch); }
+    }
+    return out;
+  }
+
+  function mulberry32(a){ return function(){ var t=a+=0x6D2B79F5; t=Math.imul(t^t>>>15,t|1); t^=t+Math.imul(t^t>>>7,t|61); return ((t^t>>>14)>>>0)/4294967296; } }
+  function weightedDraw(counts,total,rand){ let r=Math.floor(rand()*total)+1, c=0; for(let i=0;i<counts.length;i++){ c+=counts[i]; if(r<=c) return i; } return counts.length-1; }
+  function simulateOneRound(counts,rand){
+    const lc=counts.slice(); let tot=lc.reduce((a,b)=>a+b,0); if(tot<4) return null;
+    function draw(){ const i=weightedDraw(lc,tot,rand); lc[i]-=1; tot-=1; return i; }
+    const p=[draw(),draw()], b=[draw(),draw()];
+    let pt=(VALUES_LIST[p[0]]+VALUES_LIST[p[1]])%10, bt=(VALUES_LIST[b[0]]+VALUES_LIST[b[1]])%10;
+    if(!(pt===8||pt===9||bt===8||bt===9)){
+      let pv=null;
+      if(pt<=5){
+        p.push(draw()); pv=VALUES_LIST[p[p.length-1]]; pt=(pt+pv)%10;
+        if(bt<=2){ b.push(draw()); bt=(bt+VALUES_LIST[b[b.length-1]])%10; }
+        else if(bt===3 && pv!==8){ b.push(draw()); bt=(bt+VALUES_LIST[b[b.length-1]])%10; }
+        else if(bt===4 && (2<=pv&&pv<=7)){ b.push(draw()); bt=(bt+VALUES_LIST[b[b.length-1]])%10; }
+        else if(bt===5 && (4<=pv&&pv<=7)){ b.push(draw()); bt=(bt+VALUES_LIST[b[b.length-1]])%10; }
+        else if(bt===6 && (6<=pv&&pv<=7)){ b.push(draw()); bt=(bt+VALUES_LIST[b[b.length-1]])%10; }
+      }else{
+        if(bt<=5){ b.push(draw()); bt=(bt+VALUES_LIST[b[b.length-1]])%10; }
+      }
+    }
+    if(pt>bt) return 0; if(bt>pt) return 1; return 2;
+  }
+  function monteCarlo(counts,trials=30000,seed=null){
+    const wins=[0,0,0], rand=seed?mulberry32(Number(seed)>>>0):Math.random; let valid=0;
+    for(let i=0;i<trials;i++){ const r=simulateOneRound(counts,rand); if(r===null) break; wins[r]++; valid++; }
+    if(valid===0) return {p:[0,0,0], n:0}; return {p:[wins[0]/valid,wins[1]/valid,wins[2]/valid], n:valid};
+  }
+
+  // ===== Auto Save =====
+  const STORE_KEY='baccarat_pwa_state_v41_named';
+  function saveState(){ if(!document.getElementById('autoSave').checked) return;
+    const st={shoe,removed,prefs:{decks:Number(decksEl.value)||8,trials:Number(trialsEl.value)||30000,seed:seedEl.value||'',auto:document.getElementById('autoSave').checked}};
+    try{ localStorage.setItem(STORE_KEY, JSON.stringify(st)); }catch(e){} }
+  function loadState(){ try{ const raw=localStorage.getItem(STORE_KEY); if(!raw) return false; const s=JSON.parse(raw);
+    if(s&&s.shoe&&s.removed){ shoe=s.shoe; removed=s.removed; if(s.prefs){decksEl.value=s.prefs.decks??8;trialsEl.value=s.prefs.trials??30000;seedEl.value=s.prefs.seed??'';document.getElementById('autoSave').checked=!!s.prefs.auto;} refreshCounts(); return true; } }catch(e){} return false; }
+  function clearState(){ try{ localStorage.removeItem(STORE_KEY); }catch(e){} }
+
+  // UI glue
+  const decksEl=document.getElementById('decks'), trialsEl=document.getElementById('trials'), seedEl=document.getElementById('seed'), cardsEl=document.getElementById('cards');
+  const removedDiv=document.getElementById('removed'), removedCount=document.getElementById('removedCount'), remainCount=document.getElementById('remainCount');
+  const bankEl=document.getElementById('bank'), playEl=document.getElementById('play'), tieEl=document.getElementById('tie'), nEl=document.getElementById('n');
+  let shoe=newShoe(8), removed=[]; if(!loadState()){ refreshCounts(); }
+
+  function refreshCounts(){ const total=Object.values(shoe).reduce((a,b)=>a+b,0); removedCount.textContent=removed.length; remainCount.textContent=total;
+    removedDiv.innerHTML=''; removed.forEach((c,idx)=>{ const chip=document.createElement('span'); chip.className='chip';
+      chip.innerHTML='<b>'+c+'</b> <span class="x" title="移除此扣牌">×</span>'; chip.querySelector('.x').onclick=()=>{ shoe[c]=(shoe[c]||0)+1; removed.splice(idx,1); refreshCounts(); saveState(); }; removedDiv.appendChild(chip); }); }
+
+  function addCards(text){ const arr=parseCards(text); if(arr.length===0){ alert('請直接輸入如 AK103'); return; }
+    for(const c of arr){ if(RANKS.indexOf(c)===-1){ alert('無法識別：'+c); return; } if(!shoe[c]||shoe[c]<=0){ alert('牌庫不足：'+c); return; } }
+    arr.forEach(c=>{ shoe[c]-=1; removed.push(c); }); cardsEl.value=''; refreshCounts(); saveState(); }
+
+  document.getElementById('btnAdd').onclick=()=>addCards(cardsEl.value);
+  cardsEl.addEventListener('keydown', e=>{ if(e.key==='Enter') addCards(cardsEl.value); });
+  document.getElementById('btnReset').onclick=()=>{ const d=Math.max(1,Math.min(16,Number(decksEl.value)||8)); shoe=newShoe(d); removed=[]; bankEl.textContent=playEl.textContent=tieEl.textContent=nEl.textContent='-'; refreshCounts(); saveState(); };
+  document.getElementById('btnCompute').onclick=()=>{ const counts=shoeCounts(shoe), t=Math.max(1000,Number(trialsEl.value)||30000), seed=seedEl.value?Number(seedEl.value):null; const {p,n}=monteCarlo(counts,t,seed);
+    playEl.textContent=(p[0]*100).toFixed(2)+'%'; bankEl.textContent=(p[1]*100).toFixed(2)+'%'; tieEl.textContent=(p[2]*100).toFixed(2)+'%'; nEl.textContent=n.toLocaleString(); saveState(); };
+  document.getElementById('autoSave').addEventListener('change', ()=>{ if(document.getElementById('autoSave').checked) saveState(); });
+  document.getElementById('btnClearStore').onclick=()=>{ if(confirm('確定要清除儲存？')){ clearState(); alert('已清除儲存'); } };
+
+  // SW v4.1
+  if('serviceWorker' in navigator){ window.addEventListener('load', ()=>{ navigator.serviceWorker.register('./sw_v41.js'); }); }
+  </script>
+</body>
+</html>
