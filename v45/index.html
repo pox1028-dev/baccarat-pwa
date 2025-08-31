@@ -1,0 +1,141 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+  <meta name="theme-color" content="#111827"/>
+  <title>百家樂勝率計算器（v4.5 分支版 /v45）</title>
+  <link rel="manifest" href="./manifest.webmanifest">
+  <style>
+    :root { --bg:#0f172a; --card:#111827; --muted:#94a3b8; --accent:#22c55e; --text:#e5e7eb; --danger:#ef4444; }
+    *{ box-sizing:border-box; } html,body{ margin:0; padding:0; background:var(--bg); color:var(--text);
+    font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,'Noto Sans TC','PingFang TC','Hiragino Sans','Microsoft JhengHei',system-ui,sans-serif;}
+    header{ padding:16px 16px 8px; text-align:center; } h1{ margin:0; font-size:20px; }
+    .wrap{ max-width:980px; margin:0 auto; padding:10px; }
+    .card{ background:var(--card); border:1px solid #1f2937; border-radius:12px; padding:14px; margin:10px; box-shadow:0 6px 24px rgba(0,0,0,.25); }
+    label{ display:block; font-size:13px; color:var(--muted); margin-bottom:6px; }
+    input[type=text], input[type=number]{ width:100%; padding:12px; border-radius:10px; border:1px solid #334155; background:#0b1220; color:var(--text); outline:none;}
+    .row{ display:flex; gap:10px; flex-wrap:wrap; } .row > *{ flex:1 1 180px; }
+    button{ background:#1f2937; color:var(--text); border:1px solid #374151; padding:10px 12px; border-radius:10px; cursor:pointer;}
+    button.primary{ background:var(--accent); border-color:#16a34a; color:#06220f; font-weight:600; } button.danger{ background:#311316; border-color:#7f1d1d; color:#fecaca; }
+    small{ color:var(--muted); } .stats{ display:flex; gap:10px; flex-wrap:wrap; }
+    .stat{ flex:1 1 140px; background:#0b1220; border:1px solid #334155; border-radius:12px; padding:12px; text-align:center; }
+    .stat h3{ margin:0; font-size:14px; color:var(--muted); } .stat .v{ font-size:24px; font-weight:700; margin-top:6px; }
+    .chips{ margin-top:6px; } .chip{ display:inline-flex; align-items:center; gap:6px; border:1px dashed #334155; border-radius:999px; padding:5px 8px; margin:4px 6px 0 0; }
+    .x{ cursor:pointer; color:#fca5a5; font-weight:700; } .hint{ font-size:12px; color:var(--muted); margin-top:4px; }
+    table{ width:100%; border-collapse:collapse; } th,td{ border-bottom:1px solid #1f2937; padding:8px; font-size:12px; text-align:center; } th{ color:#94a3b8; font-weight:600; }
+    .scrollX{ overflow-x:auto; -webkit-overflow-scrolling: touch; border:1px solid #334155; border-radius:10px; background:#0b1220; }
+    .roadTitle{ display:flex; align-items:center; justify-content:space-between; margin-top:8px; }
+    canvas.road{ width:100%; max-height:240px; }
+  </style>
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+</head>
+<body>
+  <header><h1>百家樂勝率計算器（v4.5 分支版）</h1></header>
+  <div class="wrap">
+    <div class="card">
+      <div class="row" style="align-items:center;">
+        <div style="flex:1 1 auto;"><label>快速工具</label></div>
+        <div style="display:flex; gap:8px; flex-wrap:wrap;">
+          <button id="btnForceUpdate" class="danger">🔄 強制更新快取</button>
+          <button id="btnForceClearAll">🧹 清除所有資料（含歷史與路圖）</button>
+        </div>
+      </div>
+      <small>這個 v4.5 版本部署在 <b>/v45</b> 子路徑，與 v4.2 互不影響。</small>
+    </div>
+
+    <div class="card">
+      <div class="row">
+        <div><label>副數 (預設 8)</label><input id="decks" type="number" min="1" max="16" value="8"></div>
+        <div><label>模擬局數 Trials（建議 20000~60000）</label><input id="trials" type="number" min="1000" step="1000" value="30000"></div>
+        <div><label>固定亂數種子（可空白）</label><input id="seed" type="number" placeholder="如 20250831"></div>
+      </div>
+      <div style="margin-top:10px;">
+        <label>輸入已開牌（連續輸入即可；T 或 10 都代表 10）</label>
+        <input id="cards" type="text" placeholder="例如：AK103QQ7">
+        <div class="row" style="margin-top:10px;">
+          <button id="btnAdd">加入已開牌</button>
+          <button id="btnCompute" class="primary">計算下局勝率</button>
+          <button id="btnReset" class="danger">重設新牌靴</button>
+        </div>
+        <div class="row" style="margin-top:10px; align-items:center;">
+          <div style="display:flex; align-items:center; gap:10px;">
+            <input id="autoSave" type="checkbox" checked><label for="autoSave">自動儲存（localStorage）</label>
+          </div>
+          <button id="btnClearStore">清除儲存</button>
+        </div>
+        <div class="hint">每局把新開出的牌補進來再按「計算」。</div>
+      </div>
+    </div>
+
+    <div class="card">
+      <label>目前已扣除的牌</label>
+      <div id="removed" class="chips"></div>
+      <div class="row" style="margin-top:6px;">
+        <small>總計已扣：<span id="removedCount">0</span> 張；剩餘：<span id="remainCount">0</span> 張</small>
+      </div>
+    </div>
+
+    <div class="card">
+      <label>結果</label>
+      <div class="stats">
+        <div class="stat"><h3>莊 (Banker)</h3><div id="bank" class="v">-</div></div>
+        <div class="stat"><h3>閒 (Player)</h3><div id="play" class="v">-</div></div>
+        <div class="stat"><h3>和 (Tie)</h3><div id="tie" class="v">-</div></div>
+        <div class="stat"><h3>模擬局數</h3><div id="n" class="v">-</div></div>
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="row" style="align-items:center;">
+        <div style="flex:1 1 auto;"><label>歷史結果趨勢</label></div>
+        <div style="display:flex; gap:8px;">
+          <button id="btnExport">匯出 CSV</button>
+          <button id="btnClearHist" class="danger">清空歷史</button>
+        </div>
+      </div>
+      <canvas id="trend" style="width:100%;max-height:280px;"></canvas>
+      <div style="overflow:auto; max-height:220px; margin-top:8px;">
+        <table id="histTable">
+          <thead><tr><th>#</th><th>時間</th><th>扣牌數</th><th>剩餘</th><th>Trials</th><th>Seed</th><th>閒%</th><th>莊%</th><th>和%</th></tr></thead>
+          <tbody></tbody>
+        </table>
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="roadTitle"><b>大路 / 大眼仔 / 小路 / 曱甴路</b><small>（精簡示範，保留計算核心）</small></div>
+      <div class="scrollX"><canvas id="bigRoad" class="road"></canvas></div>
+    </div>
+
+    <div class="card" style="text-align:center; color:#94a3b8;">與 v4.2 共存：這個版本在 /v45 子資料夾。</div>
+  </div>
+
+  <script src="./v45_core.js"></script>
+  <script>
+    // 強制更新快取
+    document.getElementById('btnForceUpdate').onclick=async()=>{
+      try{
+        if('serviceWorker' in navigator){
+          const regs = await navigator.serviceWorker.getRegistrations();
+          for(const r of regs){ if(r.scope.includes('/v45/')) await r.unregister(); }
+        }
+        const keys = await caches.keys();
+        await Promise.all(keys.filter(k=>k.includes('v45')).map(k=>caches.delete(k)));
+        alert('已清除 v45 快取與 SW，重新載入中…'); location.reload(true);
+      }catch(e){ alert('清除快取時發生錯誤：'+e); }
+    };
+    document.getElementById('btnForceClearAll').onclick=()=>{
+      if(!confirm('確定清除所有資料？（包含扣牌、歷史、路圖）')) return;
+      try{ localStorage.clear(); alert('已清除本機資料'); location.reload(); }catch(e){ alert('失敗：'+e); }
+    };
+
+    // 註冊 v45 專屬 SW（scope 侷限 /v45）
+    if('serviceWorker' in navigator){
+      window.addEventListener('load', ()=>{
+        navigator.serviceWorker.register('./sw.js'); // scope 自動為 /v45/
+      });
+    }
+  </script>
+</body>
+</html>
