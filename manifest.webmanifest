@@ -1,0 +1,10 @@
+{
+  "name": "百家樂勝率計算器",
+  "short_name": "Baccarat MC",
+  "start_url": "index_v45.html",
+  "display": "standalone",
+  "background_color": "#0f172a",
+  "theme_color": "#111827",
+  "description": "新版 v4.5：含強制更新快取按鈕",
+  "icons": []
+}
